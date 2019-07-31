@@ -1,0 +1,8 @@
+columns:
+    Subject ID: ID
+    Arm Or Cohort ID: Cohort
+    Gender: Sex
+values:
+    Species: Mus musculus
+    Gender:
+        n/a: Not Specified

@@ -1,0 +1,6 @@
+columns:
+    Subject ID: ID
+    Arm Or Cohort ID: Cohort
+    Study Day: day
+patterns:
+    Result Value Reported: D(?P<day>\d+)$
