@@ -32,11 +32,6 @@ def version(package):
        return match.group(1)
 
 
-def requires():
-    with open('requirements.txt') as f:
-        return f.read().splitlines()
-
-
 def readme():
     with open("README.md") as f:
         return f.read()
@@ -67,5 +62,5 @@ setup(
         'Programming Language :: Python',
         'Programming Language :: Python :: 3',
     ],
-    install_requires = requires(),
+    install_requires = 'bunch',
 )
