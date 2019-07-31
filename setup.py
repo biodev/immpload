@@ -55,6 +55,7 @@ setup(
     scripts = glob.glob('bin/*'),
     url = 'https://github.com/biodev/imppload/',
     description = 'Immport upload preparation',
+    long_description_content_type='text/markdown',
     long_description = readme(),
     classifiers = [
         'Development Status :: 5 - Production/Stable',
