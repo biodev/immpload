@@ -38,23 +38,23 @@ def requires():
 
 
 def readme():
-    with open("README.rst") as f:
+    with open("README.md") as f:
         return f.read()
 
 
 setup(
     name = 'immpload',
     version = version('immpload'),
-    author = 'OHSU Knight Cancer Institute',
+    author = 'Oregon Health & Sciences University',
     author_email = 'loneyf@ohsu.edu',
     platforms = 'Any',
     license = 'MIT',
     keywords = 'Immpload',
     packages = find_packages(exclude=['test**']),
-    package_data = dict(immpload=['conf/*.cfg']),
+    package_data = dict(immpload=['conf/*.yaml']),
     scripts = glob.glob('bin/*'),
-    url = 'http://immpload.readthedocs.org/en/latest/',
-    description = 'Immport upload package',
+    url = 'https://github.com/biodev/imppload/',
+    description = 'Immport upload preparation',
     long_description = readme(),
     classifiers = [
         'Development Status :: 5 - Production/Stable',
