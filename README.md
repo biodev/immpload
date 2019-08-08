@@ -1,6 +1,6 @@
 # Immpload - Immport upload preparation
 
-`immpload` extracts input data files into files formatted from
+`immpload` converts input data files into files formatted from
 [Immport](http://www.immport.org/home) upload templates.
 
 ## Prerequisites
