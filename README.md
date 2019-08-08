@@ -9,7 +9,7 @@
 
 ## Installation
 
-1. Install `immpload`:
+1. Install the `immpload` Python package and executable:
 
        pip install immpload
 
