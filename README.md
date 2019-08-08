@@ -91,12 +91,24 @@ input values, resp.
 `immpload` supplies certain required output columns with a reasonable
 default, as follows:
 
-* Assessments
+* Experiment Samples (`experimentSamples.*.txt`)
+    * `Experiment ID` - lower-case, underscored `Experiment Name`
+    * `Biosample ID` - lower-case, underscored `Biosample Name`,
+       if present, otherwise the `Expsample ID`, if present,
+       otherwise derived from the `Subject ID`,  `Treatment ID`
+       and `Experiment ID`
+    * `Expsample ID` - derived from the `Biosample ID`, `Treatment ID`
+       and `Experiment ID`
+* Treatments (`treatments.txt`)
+    * `Name` - derived from the values and units
+    * `User Defined ID` - lower-case, underscored `Name`
+    * `Use Treatment?` - default is `Yes`
+* Assessments (`assessments.txt`)
     * `Planned Visit ID` - `Study ID` followed by `d` and the `Study Day`
     * `Panel Name Reported` - copied from the `Assessment Type`
     * `Assessment Panel ID` - derived from the `Panel Name Reported`
-    * `User Defined ID` - derived from the `Subject ID`, `Planned Visit ID`
-      and `Component Name Reported`
+    * `User Defined ID` - derived from the `Subject ID`,
+      `Planned Visit ID` and `Component Name Reported`
 
 For advanced usage, the `immpload` Python module can be used directly
 in a Python script with a callback function, e.g.:
@@ -113,7 +125,10 @@ def add_results(in_row, in_col_ndx_map, out_col_ndx_map, out_row):
     :param: out_row :the output row
     :return: a list of rows derived from the given output row
     """
-    # Modify out_row or create new output rows...
+    ###
+    ### Modify out_row or create new output rows here...
+    ###
+    # Return an array of rows.
     return [out_row]
 
 # Convert the input file.

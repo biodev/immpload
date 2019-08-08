@@ -10,6 +10,8 @@ from . import templates
 """The pattern to detect a config configuration pattern."""
 PATTERN_PAT = re.compile("r['\"](?P<pattern>.+)['\"]$")
 
+TREATMENT_QUALIFIER_TYPES = ['Amount', 'Temperature', 'Duration']
+
 
 class MungeError(Exception):
     pass
@@ -388,10 +390,111 @@ def _add_reagents_defaults(out_col_ndx_map, row):
         name = row[name_ndx] = analyte
     user_id_ndx = out_col_ndx_map['User Defined ID']
     if not row[user_id_ndx]:
-        row[user_id_ndx] = re.sub(r'[^\w]', '_', name).lower()
+        row[user_id_ndx] = _name_to_id(name)
     desc_ndx = out_col_ndx_map['Description']
     if not row[desc_ndx]:
         row[desc_ndx] = name
+
+
+def _qualify_treatment_name(out_col_ndx_map, row):
+    qualifiers = [_treatment_name_qualifier()
+                  for attr in ('Amount', 'Temperature', 'Duration')]
+    qualifier_s = ', '.join(filter(None, qualifiers))
+    return qualifier_s if qualifier_s else None
+
+
+def _treatment_name_qualifier(out_col_ndx_map, row, type):
+    value_ndx = out_col_ndx_map[type + ' Value']
+    value = row[value_ndx]
+    if value != None:
+        unit_ndx = out_col_ndx_map[type + ' Unit']
+        unit = row[unit_ndx]
+        if unit != 'Not Specified':
+            return ' '.join((value, unit))
+
+
+def _add_treatments_defaults(out_col_ndx_map, row):
+    """
+    Makes default values as necessary for the following required columns:
+    * `Name` - derived from the values
+    * `User Defined ID` - lower-case, underscored `Name` and `Amount Value`
+    * `Use Treatment?` - default is `Yes`
+    """
+    name_ndx = out_col_ndx_map['Name']
+    name = row[name_ndx]
+    if not name:
+        qualifiers = [_treatment_name_qualifier()
+                      for attr in TREATMENT_QUALIFIER_TYPES]
+        qualifier_s = ', '.join(filter(None, qualifiers))
+        if not qualifier_s:
+            raise MungeError("Required Name value could not be inferred from " +
+                             "the " + ','.join(attrs) + " attributes")
+        name = row[name_ndx] = qualifier_s
+    user_id_ndx = out_col_ndx_map['User Defined ID']
+    if not row[user_id_ndx]:
+        row[user_id_ndx] = _name_to_id(name)
+    use_treatment_ndx = out_col_ndx_map['Use Treatment?']
+    if not row[use_treatment_ndx]:
+        row[use_treatment_ndx] = 'Yes'
+
+
+def _add_samples_defaults(out_col_ndx_map, row):
+    """
+    Makes default values as necessary for the following required columns:
+    * `Experiment ID` - lower-case, underscored `Experiment Name`
+    * `Biosample ID` - lower-case, underscored `Biosample Name`,
+      if present, otherwise the `Expsample ID`, if present,
+      otherwise derived from the `Subject ID`, `Treatment ID`
+      and `Experiment ID`
+    * `Expsample ID` - derived from the `Biosample ID`, `Treatment ID`
+      and Experiment ID
+    """
+    experiment_id_ndx = out_col_ndx_map['Experiment ID']
+    if not row[experiment_id_ndx]:
+        name_ndx = out_col_ndx_map['Experiment Name']
+        name = row[name_ndx]
+        if not name:
+            msg = "Both the Experiment ID and Name values are missing"
+            raise MungeError(msg)
+        row[experiment_id_ndx] = _name_to_id(name)
+    biosample_id_ndx = out_col_ndx_map['Biosample ID']
+    biosample_id = row[biosample_id_ndx]
+    if not biosample_id:
+        biosample_id = _default_biosample_id(row, out_col_ndx_map)
+        row[biosample_id_ndx] = biosample_id
+    expsample_id_ndx = out_col_ndx_map['Expsample ID']
+    if not row[expsample_id_ndx]:
+        row[expsample_id_ndx] = biosample_id
+
+
+def _default_biosample_id(row, out_col_ndx_map):
+    expsample_id_ndx = out_col_ndx_map['Expsample ID']
+    expsample_id = row[expsample_id_ndx]
+    if expsample_id:
+        return expsample_id
+    name_ndx = out_col_ndx_map['Biosample Name']
+    name = row[name_ndx]
+    if name:
+        return _name_to_id(name)
+    subject_id_ndx = out_col_ndx_map['Subject ID']
+    subject_id = row[subject_id_ndx]
+    if not subject_id:
+        raise MungeError("The Biosample ID, Expsample ID, Biosample Name" +
+                         " and Subject ID values are missing")
+    experiment_id_ndx = out_col_ndx_map['Experiment ID']
+    experiment_id = row[experiment_id_ndx]
+    treatment_ids_ndx = out_col_ndx_map['Treatment ID(s)']
+    treatment_ids = row[treatment_ids_ndx]
+    if treatment_ids:
+        return '_'.join((subject_id,
+                         treatment_ids.replace(',' '_'),
+                         experiment_id))
+    else:
+        return '_'.join((subject_id, experiment_id))
+
+
+def _name_to_id(name):
+    return re.sub(r'[^\w]', '_', name).lower()
 
 
 def _read_csv(in_file):
@@ -415,5 +518,7 @@ def _read_excel(in_file, sheet=None):
 
 
 """The default callbuck functions."""
-DEF_CALLBACKS = dict(assessments=_add_assessments_defaults,
-                     reagents=_add_reagents_defaults)
+DEF_CALLBACKS = dict(experimentSamples=_add_samples_defaults,
+                     treatments=_add_treatments_defaults,
+                     reagents=_add_reagents_defaults,
+                     assessments=_add_assessments_defaults)
