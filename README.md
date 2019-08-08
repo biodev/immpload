@@ -1,4 +1,4 @@
- # Immpload - Immport upload preparation
+# Immpload - Immport upload preparation
 
 `immpload` extracts input data files into files formatted from
 [Immport](http://www.immport.org/home) upload templates.
