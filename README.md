@@ -9,9 +9,7 @@
 
 ## Installation
 
-1. Make a workspace directory.
-
-2. Install `immpload`:
+1. Install `immpload`:
 
        pip install immpload
 
