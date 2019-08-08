@@ -483,6 +483,9 @@ def _default_biosample_id(row, out_col_ndx_map):
                          " and Subject ID values are missing")
     experiment_id_ndx = out_col_ndx_map['Experiment ID']
     experiment_id = row[experiment_id_ndx]
+    if not experiment_id:
+        raise MungeError("The Biosample ID, Expsample ID, Biosample Name" +
+                         " and Experiment ID values are missing")
     treatment_ids_ndx = out_col_ndx_map['Treatment ID(s)']
     treatment_ids = row[treatment_ids_ndx]
     if treatment_ids:
