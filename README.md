@@ -93,12 +93,11 @@ default, as follows:
 
 * Experiment Samples (`experimentSamples.*.txt`)
     * `Experiment ID` - lower-case, underscored `Experiment Name`
-    * `Biosample ID` - lower-case, underscored `Biosample Name`,
-       if present, otherwise the `Expsample ID`, if present,
+    * `Biosample ID` - `Expsample ID`, if present, otherwise the
+       lower-case, underscored `Biosample Name`, if present,
        otherwise derived from the `Subject ID`,  `Treatment ID`
        and `Experiment ID`
-    * `Expsample ID` - derived from the `Biosample ID`, `Treatment ID`
-       and `Experiment ID`
+    * `Expsample ID` - `Biosample ID` (defaulted, if necessary)
 * Treatments (`treatments.txt`)
     * `Name` - derived from the values and units
     * `User Defined ID` - lower-case, underscored `Name`
@@ -109,6 +108,8 @@ default, as follows:
     * `Assessment Panel ID` - derived from the `Panel Name Reported`
     * `User Defined ID` - derived from the `Subject ID`,
       `Planned Visit ID` and `Component Name Reported`
+
+The default is set if and only if the mapped column value is missing.
 
 For advanced usage, the `immpload` Python module can be used directly
 in a Python script with a callback function, e.g.:
