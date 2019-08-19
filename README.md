@@ -1,6 +1,7 @@
 # Immpload - Immport upload preparation
 
-`immpload` converts input data files into files formatted from
+[immpload](https://github.com/biodev/immpload)
+converts input data files into files formatted from
 [Immport](http://www.immport.org/home) upload templates.
 
 ## Prerequisites
