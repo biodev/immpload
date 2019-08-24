@@ -1,0 +1,11 @@
+# Release History
+
+## Version 1.1.1 (08/26/2019)
+* Add validation option
+* Support config-only generation without an input file
+
+## Version 1.0.5 (08/08/2019)
+* Set default column values
+
+## Version 1.0.4 (07/31/2019)
+* Initial public release
