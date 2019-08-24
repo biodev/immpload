@@ -62,5 +62,5 @@ setup(
         'Programming Language :: Python',
         'Programming Language :: Python :: 3',
     ],
-    install_requires = ['bunch', 'pyyaml', 'openpyxl'],
+    install_requires = ['bunch', 'PyYAML', 'openpyxl', 'inflection'],
 )
