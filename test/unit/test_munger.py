@@ -21,57 +21,51 @@ class TestMunger(object):
             os.mkdir(RESULTS)
 
     def test_auto_convert(self):
-        munged = self._munge('subjectAnimals', fixture='subjects_auto_convert',
-                             auto_convert=True)
+        out_file = self._munge('subjectAnimals',
+                               fixture='subjects_auto_convert',
+                               Gender='Female',
+                               Min_Subject_Age=56,
+                               Subject_Location='Test Location',
+                               Species='M. musculus')
+        actual = self._read_result_file(out_file, 'subjectAnimals')
         # Compare output to expected.
         expected_file = os.path.join(EXPECTED, 'subjects_auto_convert.txt')
         expected = self._read_result_file(expected_file, 'subjectAnimals')
-        assert_equal(expected, munged, "Output differs from expected")
+        msg = "Output %s differs from expected %s" % (out_file, expected_file)
+        assert_equal(expected, actual, msg)
 
     def test_patterns(self):
-        munged = self._munge('assessments', config='assessments_patterns',
+        out_file = self._munge('assessments', config='assessments_patterns',
                              Study_ID='Test', Assessment_Type='Physical Exam',
                              Component_Name_Reported='Weight')
-        required = ['Subject ID', 'Study ID', 'Study Day',
-                    'Assessment Panel ID', 'Result Value Reported']
-        for i, row in enumerate(munged):
-            for col in required:
-                assert_is_not_none(row.get(col),
-                                   "Row %s missing %s" % (i + 1, col))
-            assert_equal(row.get('Study ID'), 'Test')
-            assert_is_not_none(row.get('Name Reported'),
-                               "Row %s missing %s" % (i + 1, col))
+        actual = self._read_result_file(out_file, 'assessments')
         # Compare output to expected.
         expected_file = os.path.join(EXPECTED, 'assessments.txt')
         expected = self._read_result_file(expected_file, 'assessments')
-        assert_equal(expected, munged, "Output differs from expected")
+        msg = "Output %s differs from expected %s" % (out_file, expected_file)
+        assert_equal(expected, actual, msg)
 
     def test_callback(self):
-        munged = self._munge('assessments', config='assessments_flat',
-                             callback=_add_weights,
-                             Study_ID='Test', Assessment_Type='Physical Exam',
-                             Component_Name_Reported='Weight')
-        required = ['Subject ID', 'Study ID', 'Study Day',
-                    'Assessment Panel ID', 'Result Value Reported']
-        for i, row in enumerate(munged):
-            for col in required:
-                assert_is_not_none(row.get(col),
-                                   "Row %s missing %s" % (i + 1, col))
-            assert_equal(row.get('Study ID'), 'Test')
-            assert_is_not_none(row.get('Name Reported'),
-                               "Row %s missing %s" % (i + 1, col))
+        out_file = self._munge('assessments', config='assessments_flat',
+                               callback=_add_weights,
+                               Study_ID='Test', Assessment_Type='Physical Exam',
+                               Component_Name_Reported='Weight')
+        actual = self._read_result_file(out_file, 'assessments')
         # Compare output to expected.
         expected_file = os.path.join(EXPECTED, 'assessments.txt')
         expected = self._read_result_file(expected_file, 'assessments')
-        assert_equal(expected, munged, "Output differs from expected")
+        msg = "Output %s differs from expected %s" % (out_file, expected_file)
+        assert_equal(expected, actual, msg)
 
     def test_values(self):
-        munged = self._munge('subjectAnimals', fixture='subjects',
-                             config='subjects_values')
+        out_file = self._munge('subjectAnimals', fixture='subjects',
+                               config='subjects_values')
+        actual = self._read_result_file(out_file, 'subjectAnimals')
         # Compare output to expected.
         expected_file = os.path.join(EXPECTED, 'subjectAnimals.txt')
         expected = self._read_result_file(expected_file, 'subjectAnimals')
-        assert_equal(expected, munged, "Output differs from expected")
+        msg = "Output %s differs from expected %s" % (out_file, expected_file)
+        assert_equal(expected, actual, msg)
 
     def test_bogus_column(self):
         with assert_raises(MungeError):
@@ -82,23 +76,26 @@ class TestMunger(object):
         assert_in('disambiguated', msg, "Error message incorrect")
 
     def _munge(self, template, fixture=None, config=None, callback=None,
-               auto_convert=False, **kwargs):
+               **kwargs):
         if not fixture:
             fixture = template
-        if not auto_convert and not config:
-            config = fixture
         in_file = os.path.join(INPUTS, fixture + '.xlsx')
         if config:
             config_file = os.path.join(CONFIGURATIONS, config + '.yaml')
         else:
-            config_file = None
+            def_config_file = os.path.join(CONFIGURATIONS, fixture + '.yaml')
+            if os.path.exists(def_config_file):
+                config = fixture
+                config_file = def_config_file
+            else:
+                config_file = None
         out_subdir = config if config else 'auto_convert'
         out_dir = os.path.join(RESULTS, template, out_subdir)
         out_file = munger.munge(template, in_file, config=config_file,
                                 out_dir=out_dir, callback=callback,
-                                **kwargs)
+                                validate=True, **kwargs)
         assert_is_not_none(out_file, "%s not munged" % template)
-        return self._read_result_file(out_file, template)
+        return out_file
 
     def _read_result_file(self, in_file, template):
         with open(in_file) as fs:
@@ -127,18 +124,18 @@ class TestMunger(object):
             return cols
 
 
-def _add_weights(in_row, in_cols, out_col_ndx_map, out_row):
+def _add_weights(in_row, in_col_ndx_map, out_col_ndx_map, out_row):
     return [_add_weight(out_row, out_col_ndx_map, col, in_row[i])
-            for i, col in enumerate(in_cols)
+            for i, col in enumerate(in_col_ndx_map)
             if re.match(r'D\d+$', col) and in_row[i]]
 
 
 def _add_weight(out_row, out_col_ndx_map, col, weight):
+    row = out_row.copy()
     day_ndx = out_col_ndx_map['Study Day']
     day = int(col[1:])
-    amended = out_row.copy()
-    amended[day_ndx] = day
+    row[day_ndx] = day
     value_ndx = out_col_ndx_map['Result Value Reported']
-    amended[value_ndx] = weight
+    row[value_ndx] = weight
 
-    return amended
+    return row

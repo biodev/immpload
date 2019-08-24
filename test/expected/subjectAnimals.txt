@@ -1,9 +1,9 @@
 subjectanimals	Schema Version 3.19
 Please do not delete or edit this column
 Column Name	Subject ID	Arm Or Cohort ID	Gender	Min Subject Age	Max Subject Age	Age Unit	Age Event	Age Event Specify	Subject Phenotype	Subject Location	Species	Strain	Strain Characteristics	Result Separator Column	Exposure Process Reported	Exposure Material Reported	Exposure Material ID	Disease Reported	Disease Ontology ID	Disease Stage Reported
-	8034x8043_151	12_15xiv	Not Specified								Mus musculus									
-	8034x8043_152	12_15xiv	M								Mus musculus									
-	8034x8043_156	12_15xiv	F								Mus musculus									
-	15119x16521_53	12_15xiv	Not Specified								Mus musculus									
-	15119x16521_57	12_15xiv									Mus musculus									
-	15119x16521_58	12_15xiv									Mus musculus									
+	8034x8043_151	12_15xiv	Not Specified	56		Days	Age at infection			Test Location	Mus musculus	8034x8043								
+	8034x8043_152	12_15xiv	Male	56		Days	Age at infection			Test Location	Mus musculus	8034x8043								
+	8034x8043_156	12_15xiv	Female	56		Days	Age at infection			Test Location	Mus musculus	8034x8043								
+	15119x16521_53	12_15xiv	Not Specified	56		Days	Age at infection			Test Location	Mus musculus	15119x16521								
+	15119x16521_57	12_15xiv	Female	56		Days	Age at infection			Test Location	Mus musculus	15119x16521								
+	15119x16521_58	12_15xiv	Male	56		Days	Age at infection			Test Location	Mus musculus	15119x16521								

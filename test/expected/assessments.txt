@@ -1,21 +1,21 @@
 assessments	Schema Version 3.19
 Please do not delete or edit this column
 Column Name	Subject ID	Assessment Panel ID	Study ID	Name Reported	Assessment Type	Status	CRF File Names	Result Separator Column	User Defined ID	Planned Visit ID	Name Reported	Study Day	Age At Onset Reported	Age At Onset Unit Reported	Is Clinically Significant	Location Of Finding Reported	Organ Or Body System Reported	Result Value Reported	Result Unit Reported	Result Value Category	Subject Position Reported	Time Of Day	Verbatim Question	Who Is Assessed
-	8034x8043_151	physical_exam	Test	Physical Exam	Physical Exam				8034x8043_151.test.d0.weight	test.d0	Weight	0						20.4						
-	8034x8043_151	physical_exam	Test	Physical Exam	Physical Exam				8034x8043_151.test.d1.weight	test.d1	Weight	1						20.1						
-	8034x8043_152	physical_exam	Test	Physical Exam	Physical Exam				8034x8043_152.test.d0.weight	test.d0	Weight	0						21.2						
-	8034x8043_152	physical_exam	Test	Physical Exam	Physical Exam				8034x8043_152.test.d1.weight	test.d1	Weight	1						21						
-	8034x8043_156	physical_exam	Test	Physical Exam	Physical Exam				8034x8043_156.test.d0.weight	test.d0	Weight	0						20.4						
-	8034x8043_156	physical_exam	Test	Physical Exam	Physical Exam				8034x8043_156.test.d1.weight	test.d1	Weight	1						20.3						
-	15119x16521_53	physical_exam	Test	Physical Exam	Physical Exam				15119x16521_53.test.d0.weight	test.d0	Weight	0						21.9						
-	15119x16521_53	physical_exam	Test	Physical Exam	Physical Exam				15119x16521_53.test.d1.weight	test.d1	Weight	1						22.3						
-	15119x16521_53	physical_exam	Test	Physical Exam	Physical Exam				15119x16521_53.test.d2.weight	test.d2	Weight	2						22.3						
-	15119x16521_53	physical_exam	Test	Physical Exam	Physical Exam				15119x16521_53.test.d10.weight	test.d10	Weight	10						23.6						
-	15119x16521_53	physical_exam	Test	Physical Exam	Physical Exam				15119x16521_53.test.d16.weight	test.d16	Weight	16						22.1						
-	15119x16521_57	physical_exam	Test	Physical Exam	Physical Exam				15119x16521_57.test.d0.weight	test.d0	Weight	0						19.6						
-	15119x16521_57	physical_exam	Test	Physical Exam	Physical Exam				15119x16521_57.test.d1.weight	test.d1	Weight	1						20.2						
-	15119x16521_57	physical_exam	Test	Physical Exam	Physical Exam				15119x16521_57.test.d2.weight	test.d2	Weight	2						20.3						
-	15119x16521_58	physical_exam	Test	Physical Exam	Physical Exam				15119x16521_58.test.d0.weight	test.d0	Weight	0						18.5						
-	15119x16521_58	physical_exam	Test	Physical Exam	Physical Exam				15119x16521_58.test.d1.weight	test.d1	Weight	1						18.9						
-	15119x16521_58	physical_exam	Test	Physical Exam	Physical Exam				15119x16521_58.test.d2.weight	test.d2	Weight	2						18.8						
-	15119x16521_58	physical_exam	Test	Physical Exam	Physical Exam				15119x16521_58.test.d13.weight	test.d13	Weight	13						19.4						
+	8034x8043_151	physical_exam	Test	Physical Exam	Physical Exam				8034x8043_151_test_d0_weight	test_d0	Weight	0						20.4						
+	8034x8043_151	physical_exam	Test	Physical Exam	Physical Exam				8034x8043_151_test_d1_weight	test_d1	Weight	1						20.1						
+	8034x8043_152	physical_exam	Test	Physical Exam	Physical Exam				8034x8043_152_test_d0_weight	test_d0	Weight	0						21.2						
+	8034x8043_152	physical_exam	Test	Physical Exam	Physical Exam				8034x8043_152_test_d1_weight	test_d1	Weight	1						21						
+	8034x8043_156	physical_exam	Test	Physical Exam	Physical Exam				8034x8043_156_test_d0_weight	test_d0	Weight	0						20.4						
+	8034x8043_156	physical_exam	Test	Physical Exam	Physical Exam				8034x8043_156_test_d1_weight	test_d1	Weight	1						20.3						
+	15119x16521_53	physical_exam	Test	Physical Exam	Physical Exam				15119x16521_53_test_d0_weight	test_d0	Weight	0						21.9						
+	15119x16521_53	physical_exam	Test	Physical Exam	Physical Exam				15119x16521_53_test_d1_weight	test_d1	Weight	1						22.3						
+	15119x16521_53	physical_exam	Test	Physical Exam	Physical Exam				15119x16521_53_test_d2_weight	test_d2	Weight	2						22.3						
+	15119x16521_53	physical_exam	Test	Physical Exam	Physical Exam				15119x16521_53_test_d10_weight	test_d10	Weight	10						23.6						
+	15119x16521_53	physical_exam	Test	Physical Exam	Physical Exam				15119x16521_53_test_d16_weight	test_d16	Weight	16						22.1						
+	15119x16521_57	physical_exam	Test	Physical Exam	Physical Exam				15119x16521_57_test_d0_weight	test_d0	Weight	0						19.6						
+	15119x16521_57	physical_exam	Test	Physical Exam	Physical Exam				15119x16521_57_test_d1_weight	test_d1	Weight	1						20.2						
+	15119x16521_57	physical_exam	Test	Physical Exam	Physical Exam				15119x16521_57_test_d2_weight	test_d2	Weight	2						20.3						
+	15119x16521_58	physical_exam	Test	Physical Exam	Physical Exam				15119x16521_58_test_d0_weight	test_d0	Weight	0						18.5						
+	15119x16521_58	physical_exam	Test	Physical Exam	Physical Exam				15119x16521_58_test_d1_weight	test_d1	Weight	1						18.9						
+	15119x16521_58	physical_exam	Test	Physical Exam	Physical Exam				15119x16521_58_test_d2_weight	test_d2	Weight	2						18.8						
+	15119x16521_58	physical_exam	Test	Physical Exam	Physical Exam				15119x16521_58_test_d13_weight	test_d13	Weight	13						19.4						

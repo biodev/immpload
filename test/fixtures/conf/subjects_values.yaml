@@ -5,4 +5,9 @@ columns:
 values:
     Species: Mus musculus
     Gender:
+        F: Female
+        M: Male
         n/a: Not Specified
+        ~: Not Specified
+    Min Subject Age: 56
+    Subject Location: Test Location
