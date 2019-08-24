@@ -38,6 +38,8 @@ $ immpload --help
 ```
 shows all `immpload` arguments and options.
 
+## Mapping Configuration
+
 It is often useful to specify the conversion mapping in a
 [YAML](https://en.wikipedia.org/wiki/YAML) configuration file.
 For example, the following configuration:
@@ -73,7 +75,8 @@ transforms the input `Sex` value `n/a` to the output `Gender` value
 `Not Specified`. Other input values are copied without change.
 
 `immpload` can flatten each input row into several output rows based
-on matching input column names against a pattern. The configuration:
+on matching input column names against a pattern. For example, the
+configuration:
 ```
 columns:
     Subject ID: ID
@@ -87,8 +90,29 @@ output rows with column `Study Day` values `1`, `2` and `3`
 and `Result Value Reported` values given by the `D1`, `D2` and `D3`
 input values, resp.
 
+Immport upload data can be derived solely from fields embedded in
+column names. For example, the configuration:
+```
+columns:
+    Analyte Reported: analyte
+patterns:
+    Analyte Reported: (?P<subject>.+)_(?P<day>.+)_(?P<analyte>.+)$
+```
+matches the input column names against the given pattern and
+writes one output row per matching column with the `Analyte Reported`
+column set to the embedded _analyte_ match value. In this case,
+no other input rows are read besides the first header row of column
+names. Note that `Analyte Reported` is assigned the match value
+rather than the matching column value.
+
+## Defaults
+
 `immpload` supplies certain required output columns with a reasonable
 default, as follows:
+
+* Animal Subjects (`subjectAnimals.txt`)
+  * `Age Unit` - `Days`
+  * `Age Event` - `Age at infection`
 
 * Experiment Samples (`experimentSamples.*.txt`)
     * `Experiment ID` - lower-case, underscored `Experiment Name`
@@ -109,6 +133,8 @@ default, as follows:
       `Planned Visit ID` and `Component Name Reported`
 
 The default is set if and only if the mapped column value is missing.
+
+## Callbacks
 
 For advanced usage, the `immpload` Python module can be used directly
 in a Python script with a callback function, e.g.:
