@@ -5,20 +5,18 @@ import yaml
 from bunch import Bunch
 import openpyxl
 import functools
-from . import templates
+from . import (templates, defaults, validators)
 
 """The pattern to detect a config configuration pattern."""
 PATTERN_PAT = re.compile("r['\"](?P<pattern>.+)['\"]$")
-
-TREATMENT_QUALIFIER_TYPES = ['Amount', 'Temperature', 'Duration']
 
 
 class MungeError(Exception):
     pass
 
 
-def munge(template, *in_files, config=None, out_dir=None,
-          sheet=None, input_filter=None, callback=None, **kwargs):
+def munge(template, *in_files, config=None, out_dir=None, sheet=None,
+          input_filter=None, callback=None, validate=False, **kwargs):
     """
     Builds the Immport upload file for the given input file.
     The template is a supported Immport template name, e.g.
@@ -30,6 +28,10 @@ def munge(template, *in_files, config=None, out_dir=None,
     output row. The column name can be underscored, e.g.
     `Study_ID`.
 
+    Output validation is disabled by default, but recommended
+    for new uploads. Enable validation by setting the _validate_
+    flag parameter to `True`.
+
     :param template: the required Immport template name
     :param in_files: the input file(s) to munge
     :param config: the configuration dictionary or file name
@@ -40,15 +42,13 @@ def munge(template, *in_files, config=None, out_dir=None,
     :param callback: optional callback with parameters
         in_row, in_col_ndx_map, out_col_ndx_map and out_row returning
         an array of rows to write to the output file
+    :param validate: flag indicating whether to validate the
+        output for required fields (default `False`)
     :param kwargs: the optional static _column_`=`_value_ definitions
     :return: the output file name
     """
     # Note: this method signature and apidoc is copied in the
     # package README.md file.
-
-    # If neither a config nor a callback, then auto-convert
-    # the input.
-    auto_convert = config == None and callback == None
 
     # Load the config file, if necessary.
     if config == None:
@@ -58,32 +58,36 @@ def munge(template, *in_files, config=None, out_dir=None,
             config = yaml.safe_load(fs)
     # Parse the config to a {name, value} bunch.
     config = _parse_config(config)
-    config.auto_convert = auto_convert
+    # Collect options into the config.
     config.in_filter = input_filter
 
     # Remove the template file suffix, if necessary.
     template = re.sub("\.txt$", '', template)
     # Acquire the template object.
-    tmpl = templates.template_for(template)
+    config.template = templates.template_for(template)
     # Make the output column {name: index} dictionary.
-    config.out_col_ndx_map = {col: i for i, col in enumerate(tmpl.columns)}
+    config.out_col_ndx_map = {col: i
+                              for i, col in enumerate(config.template.columns)}
     # Add the kwargs to the config.
     static_kwargs = {key.replace('_', ' '): value
                      for key, value in kwargs.items()}
     config.static.update(static_kwargs)
     # Validate the static definition.
     for out_col in config.static:
-        _validate_static_column(out_col, tmpl)
+        _validate_static_column(out_col, config.template)
     # Add the default template callback, if necessary.
-    def_callback = DEF_CALLBACKS.get(template)
-    if not def_callback and '.' in template:
-        prefix = template.split('.')[0]
-        def_callback = DEF_CALLBACKS.get(prefix)
+    def_callback = defaults.get_defaults_callback(template)
     if def_callback:
-        config.callback = functools.partial(_add_defaults, def_callback,
-                                            callback=callback)
-    else:
-        config.callback = callback
+        callback = functools.partial(_add_defaults, def_callback,
+                                     callback=callback)
+    # Add validation, if necessary.
+    if validate:
+        validator = validators.get_validator(template)
+        if validator:
+            callback = functools.partial(_validate_output, validator,
+                                         callback=callback)
+    # Set the composite configuration callback.
+    config.callback = callback
 
     # Prepare the output location.
     if out_dir:
@@ -96,11 +100,16 @@ def munge(template, *in_files, config=None, out_dir=None,
     # Convert the input to output.
     with open(out_file, 'w') as fs:
         writer = csv.writer(fs, delimiter='\t')
-        for in_file in in_files:
-            reader = _create_reader(in_file, sheet=sheet)
-            _munge_file(tmpl, reader, writer, config=config)
+        if in_files:
+            for in_file in in_files:
+                reader = _create_reader(in_file, sheet=sheet)
+                _munge_file(in_file, reader, writer, config)
+        else:
+            # Only use the configuration to generate output.
+            _munge_config(writer, config)
 
     return out_file
+
 
 def _validate_static_column(out_col, template):
     if not out_col in template.columns:
@@ -114,7 +123,8 @@ def _validate_static_column(out_col, template):
             msg = "Output column not found: %s" % out_col
         raise MungeError(msg)
 
-def _is_valid_row(row, config):
+
+def _is_valid_input_row(row, config):
     """
     Filters blank rows and applies the optional row filter
     argument as necessary.
@@ -124,6 +134,18 @@ def _is_valid_row(row, config):
         return False
     # Apply the config filter, if any.
     return config.in_filter(row) if config.in_filter else True
+
+
+def _validate_output(validator, in_row, in_col_ndx_map, out_col_ndx_map,
+                     out_row, callback=None):
+    if callback:
+        out_rows = callback(in_row, in_col_ndx_map, out_col_ndx_map, out_row)
+    else:
+        out_rows = [out_row]
+    for row in out_rows:
+        validator(row, out_col_ndx_map)
+
+    return out_rows
 
 
 def _parse_config(config):
@@ -167,34 +189,74 @@ def _compile_config_pattern(pattern, out_col):
         raise MungeError() from e
 
 
-def _munge_file(template, reader, writer, config):
+def _munge_file(in_file, reader, writer, config):
     in_cols = None
     for i, in_row in enumerate(reader):
         # The first (possibly filtered) input file row is
         # the input column names.
         if i == 0:
             # Capture the input column names and indexes.
-            config.in_col_ndx_map = {name: i for i, name in enumerate(in_row)}
-            # If auto-convert is set, then map the input
-            # to the output based on matching column names.
-            if config.auto_convert:
-                for in_col in config.in_col_ndx_map:
-                    if (in_col in config.out_col_ndx_map and
-                        not in_col in config.names):
-                        config.names[in_col] = in_col
-            # Write the Immport template header lines.
-            _write_header(template, writer)
-            # Write the template column names.
-            _write_column_names(template, writer)
-            # Parse the config patterns, now that we have input
-            # columns to match against.
-            _make_embedded_config(config)
-        elif _is_valid_row(in_row, config):
-            # Format the output rows.
-            out_rows = _generate_output(in_row, template, config)
-            # Write the generated rows.
-            if out_rows:
-                writer.writerows(out_rows)
+            _capture_input_columns(in_row, config, writer)
+            # If the output is entirely determined by column name matching,
+            # then generate the output and skip the remaining lines.
+            if set(config.names.values()) == set(config.patterns.values()):
+                _munge_row(in_file, in_row, i, config, writer)
+                return
+        elif _is_valid_input_row(in_file, in_row, i, config):
+            _munge_row(in_file, in_row, config, writer)
+
+
+def _capture_input_columns(in_row, config, writer):
+    # Capture the input column names and indexes.
+    config.in_col_ndx_map = {name: i for i, name in enumerate(in_row)}
+    # Auto-convert the input columns which match
+    # output column names.
+    for in_col in config.in_col_ndx_map:
+        if (in_col in config.out_col_ndx_map and
+            not in_col in config.names):
+            config.names[in_col] = in_col
+    # Write the Immport template header lines.
+    _write_header(config.template, writer)
+    # Parse the config patterns, now that we have input
+    # columns to match against.
+    _make_embedded_config(config)
+
+
+def _munge_row(in_file, in_row, index, config, writer):
+    # The output row generator.
+    out_rows = _generate_output(in_row, config)
+    # Write the generated rows.
+    try:
+        writer.writerows(out_rows)
+    except Exception as e:
+        msg = ("Error generating %s output for input row %d in %s" %
+               (config.template.name, index + 1, in_file))
+        raise MungeError(msg) from e
+
+def _munge_config(writer, config):
+    """
+    Generates output based solely on the configuration.
+    """
+    # Make an empty input {column: index} and embedded map.
+    config.in_col_ndx_map = {}
+    config.embedded = {}
+    # Write the Immport template header lines.
+    _write_header(config.template, writer)
+    # The output row generator.
+    out_rows = _generate_output([], config)
+    # Write the generated rows.
+    try:
+        writer.writerows(out_rows)
+    except Exception as e:
+        msg = "Error generating %s output" % config.template.name
+        raise MungeError(msg) from e
+
+
+def _write_header(template, writer):
+    # Write the Immport template header lines.
+    _write_prequel(template, writer)
+    # Write the template column names.
+    _write_column_names(template, writer)
 
 
 def _make_embedded_config(config):
@@ -202,8 +264,7 @@ def _make_embedded_config(config):
     Matches config patterns against the input columns to create a
     new config attribute _embedded_ holding a list of
     (output column index: matches) tuples, where _matches_ is a list
-    of (input column index, match dictionary) tuples. The patterns
-    are removed from _config.names_.
+    of (input column index, match dictionary) tuples.
     """
     # Make the {output column: {output column: value}} dictionary.
     config.embedded = {out_col: _match_input_columns(pattern, config)
@@ -243,7 +304,7 @@ def _create_reader(in_file, sheet=None):
     return reader
 
 
-def _write_header(template, writer):
+def _write_prequel(template, writer):
     # Write the Immport template header lines.
     for hdg in template.header:
         writer.writerow(hdg)
@@ -258,7 +319,28 @@ def _write_column_names(template, writer):
     writer.writerow(columns)
 
 
-def _generate_output(in_row, template, config):
+def _generate_output(in_row, config):
+    # Map the columns.
+    out_row = _map_row(in_row, config)
+    # Expand each embedded config into a separate row.
+    if config.embedded:
+        out_rows = _generate_embedded_output(in_row, out_row, config)
+    else:
+        out_rows = (out_row,)
+    for out_row in out_rows:
+        if config.callback:
+            for row in _apply_callback(in_row, config, out_row):
+                yield row
+        else:
+            yield out_row
+
+
+def _apply_callback(in_row, config, out_row):
+    return config.callback(in_row, config.in_col_ndx_map,
+                           config.out_col_ndx_map, out_row)
+
+
+def _map_row(in_row, config):
     # Map the output columns to output values.
     values = {config.names[col]: _map_value(col, in_row[i], config)
               for i, col in enumerate(config.in_col_ndx_map)
@@ -269,19 +351,8 @@ def _generate_output(in_row, template, config):
         # Get the static definition output column index.
         out_col_ndx = config.out_col_ndx_map[out_col]
         out_row[out_col_ndx] = value
-    # Expand each embedded config into a separate row.
-    if config.embedded:
-        out_rows = _generate_embedded_output(in_row, out_row, config)
-    else:
-        out_rows = (out_row,)
-    i = 0
-    for out_row in out_rows:
-        if config.callback:
-            for row in config.callback(in_row, config.in_col_ndx_map,
-                                       config.out_col_ndx_map, out_row):
-                yield row
-        else:
-            yield out_row
+
+    return out_row
 
 
 def _map_value(in_col, value, config):
@@ -306,6 +377,13 @@ def _generate_embedded_output(in_row, out_row, config):
 
 
 def _create_embedded_row(value, out_row, out_col_ndx, config, group_values):
+    """
+    Copies the given output row and assigns the given pattern match
+    group values to the corresponding output row columns defined by
+    the configuration.
+
+    :return: the new output row
+    """
     # Make a new output row.
     row = out_row.copy()
     # Set the embedded column.
@@ -320,187 +398,29 @@ def _create_embedded_row(value, out_row, out_col_ndx, config, group_values):
 
 def _add_defaults(def_callback, in_row, in_col_ndx_map, out_col_ndx_map,
                   out_row, callback=None):
+    """
+    Assigns defaults to the generated output rows.
+
+    :return: the generated output rows
+    :rtype: list
+    """
     if callback:
         out_rows = callback(in_row, in_col_ndx_map, out_col_ndx_map, out_row)
     else:
         out_rows = [out_row]
     for row in out_rows:
-        def_callback(out_col_ndx_map, row)
+        def_callback(row, out_col_ndx_map)
 
     return out_rows
 
 
-def _add_assessments_defaults(out_col_ndx_map, row):
-    """
-    Makes default values as necessary for the following required columns:
-    * `Planned Visit ID` - `Study ID` followed by `d` and the `Study Day`
-    * `Panel Name Reported` - copied from the `Assessment Type`
-    * `Assessment Panel ID` - derived from the `Panel Name Reported`
-    * `User Defined ID` - derived from the `Subject ID`, `Planned Visit ID`
-      and `Component Name Reported`
-    """
-    visit_id_ndx = out_col_ndx_map['Planned Visit ID']
-    visit_id = row[visit_id_ndx]
-    if not visit_id:
-        study_id = row[out_col_ndx_map['Study ID']]
-        if not study_id:
-            raise MungeError("Required Study ID value is missing")
-        day = row[out_col_ndx_map['Study Day']]
-        if day == None:
-            raise MungeError("Required Study Day value is missing")
-        day_id = 'd' + str(day)
-        visit_id = row[visit_id_ndx] = '.'.join((study_id.lower(), day_id))
-    panel_name_ndx = out_col_ndx_map['Panel Name Reported']
-    panel_name = row[panel_name_ndx]
-    if not panel_name:
-        type = row[out_col_ndx_map['Assessment Type']]
-        if not type:
-            raise MungeError("Neither the Panel Name Reported nor the " +
-                             "Assessment Type value is missing")
-        panel_name = row[panel_name_ndx] = type
-    panel_id_ndx = out_col_ndx_map['Assessment Panel ID']
-    panel_id = row[panel_id_ndx]
-    if not panel_id:
-        panel_id = row[panel_id_ndx] = panel_name.lower().replace(' ', '_')
-    user_id_ndx = out_col_ndx_map['User Defined ID']
-    if not row[user_id_ndx]:
-        subject_id = row[out_col_ndx_map['Subject ID']]
-        if not subject_id:
-            raise MungeError("Required Subject ID value is missing")
-        component_name_ndx = out_col_ndx_map['Component Name Reported']
-        component_name = row[component_name_ndx]
-        if not component_name:
-            raise MungeError("Required Component Name Reported value is missing")
-        row[user_id_ndx] = '.'.join((subject_id, visit_id, component_name.lower()))
-
-
-def _add_reagents_defaults(out_col_ndx_map, row):
-    """
-    Makes default values as necessary for the following required columns:
-    * `Name` - copied from the `Analyte Reported`
-    * `User Defined ID` - derived from the `Name`
-    * `Description` copied from `Name`
-    """
-    name_ndx = out_col_ndx_map['Name']
-    name = row[name_ndx]
-    if not name:
-        analyte = row[out_col_ndx_map['Analyte Reported']]
-        if not analyte:
-            raise MungeError("Required Analyte Reported value is missing")
-        name = row[name_ndx] = analyte
-    user_id_ndx = out_col_ndx_map['User Defined ID']
-    if not row[user_id_ndx]:
-        row[user_id_ndx] = _name_to_id(name)
-    desc_ndx = out_col_ndx_map['Description']
-    if not row[desc_ndx]:
-        row[desc_ndx] = name
-
-
-def _qualify_treatment_name(out_col_ndx_map, row):
-    qualifiers = [_treatment_name_qualifier()
-                  for attr in ('Amount', 'Temperature', 'Duration')]
-    qualifier_s = ', '.join(filter(None, qualifiers))
-    return qualifier_s if qualifier_s else None
-
-
-def _treatment_name_qualifier(out_col_ndx_map, row, type):
-    value_ndx = out_col_ndx_map[type + ' Value']
-    value = row[value_ndx]
-    if value != None:
-        unit_ndx = out_col_ndx_map[type + ' Unit']
-        unit = row[unit_ndx]
-        if unit != 'Not Specified':
-            return ' '.join((value, unit))
-
-
-def _add_treatments_defaults(out_col_ndx_map, row):
-    """
-    Makes default values as necessary for the following required columns:
-    * `Name` - derived from the values
-    * `User Defined ID` - lower-case, underscored `Name` and `Amount Value`
-    * `Use Treatment?` - default is `Yes`
-    """
-    name_ndx = out_col_ndx_map['Name']
-    name = row[name_ndx]
-    if not name:
-        qualifiers = [_treatment_name_qualifier()
-                      for attr in TREATMENT_QUALIFIER_TYPES]
-        qualifier_s = ', '.join(filter(None, qualifiers))
-        if not qualifier_s:
-            raise MungeError("Required Name value could not be inferred from " +
-                             "the " + ','.join(attrs) + " attributes")
-        name = row[name_ndx] = qualifier_s
-    user_id_ndx = out_col_ndx_map['User Defined ID']
-    if not row[user_id_ndx]:
-        row[user_id_ndx] = _name_to_id(name)
-    use_treatment_ndx = out_col_ndx_map['Use Treatment?']
-    if not row[use_treatment_ndx]:
-        row[use_treatment_ndx] = 'Yes'
-
-
-def _add_samples_defaults(out_col_ndx_map, row):
-    """
-    Makes default values as necessary for the following required columns:
-    * `Experiment ID` - lower-case, underscored `Experiment Name`
-    * `Biosample ID` - lower-case, underscored `Biosample Name`,
-      if present, otherwise the `Expsample ID`, if present,
-      otherwise derived from the `Subject ID`, `Treatment ID`
-      and `Experiment ID`
-    * `Expsample ID` - derived from the `Biosample ID`, `Treatment ID`
-      and Experiment ID
-    """
-    experiment_id_ndx = out_col_ndx_map['Experiment ID']
-    if not row[experiment_id_ndx]:
-        name_ndx = out_col_ndx_map['Experiment Name']
-        name = row[name_ndx]
-        if not name:
-            msg = "Both the Experiment ID and Name values are missing"
-            raise MungeError(msg)
-        row[experiment_id_ndx] = _name_to_id(name)
-    biosample_id_ndx = out_col_ndx_map['Biosample ID']
-    biosample_id = row[biosample_id_ndx]
-    if not biosample_id:
-        biosample_id = _default_biosample_id(row, out_col_ndx_map)
-        row[biosample_id_ndx] = biosample_id
-    expsample_id_ndx = out_col_ndx_map['Expsample ID']
-    if not row[expsample_id_ndx]:
-        row[expsample_id_ndx] = biosample_id
-
-
-def _default_biosample_id(row, out_col_ndx_map):
-    expsample_id_ndx = out_col_ndx_map['Expsample ID']
-    expsample_id = row[expsample_id_ndx]
-    if expsample_id:
-        return expsample_id
-    name_ndx = out_col_ndx_map['Biosample Name']
-    name = row[name_ndx]
-    if name:
-        return _name_to_id(name)
-    subject_id_ndx = out_col_ndx_map['Subject ID']
-    subject_id = row[subject_id_ndx]
-    if not subject_id:
-        raise MungeError("The Biosample ID, Expsample ID, Biosample Name" +
-                         " and Subject ID values are missing")
-    experiment_id_ndx = out_col_ndx_map['Experiment ID']
-    experiment_id = row[experiment_id_ndx]
-    if not experiment_id:
-        raise MungeError("The Biosample ID, Expsample ID, Biosample Name" +
-                         " and Experiment ID values are missing")
-    treatment_ids_ndx = out_col_ndx_map['Treatment ID(s)']
-    treatment_ids = row[treatment_ids_ndx]
-    if treatment_ids:
-        return '_'.join((subject_id,
-                         treatment_ids.replace(',' '_'),
-                         experiment_id))
-    else:
-        return '_'.join((subject_id, experiment_id))
-
-
-def _name_to_id(name):
-    return re.sub(r'[^\w]', '_', name).lower()
-
-
 def _read_csv(in_file):
+    """
+    Reads the given comma- or tab-separated file.
+
+    :param in_file: the `.csv` CSV file or `.txt` TSV file
+    :yield: each non-empty input row
+    """
     kwargs = {}
     if in_file.endswith('.txt'):
         kwargs['delimiter'] = '\t'
@@ -513,15 +433,16 @@ def _read_csv(in_file):
 
 
 def _read_excel(in_file, sheet=None):
+    """
+    Reads the given Excel file.
+
+    :param in_file: the `.xslx` workbook file
+    :param sheet: the optional worksheet (default is the worksheet
+        displayed when the workbook was last saved)
+    :yield: each worksheet row as a list of cell values
+    """
     wb = openpyxl.load_workbook(in_file, read_only=True)
     ws = wb.get_sheet_by_name(sheet) if sheet else wb.active
     for row in ws:
         if row:
             yield [cell.value for cell in row]
-
-
-"""The default callbuck functions."""
-DEF_CALLBACKS = dict(experimentSamples=_add_samples_defaults,
-                     treatments=_add_treatments_defaults,
-                     reagents=_add_reagents_defaults,
-                     assessments=_add_assessments_defaults)
