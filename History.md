@@ -1,6 +1,6 @@
 # Release History
 
-## Version 1.1.1 (08/26/2019)
+## Version 1.1.1 (09/03/2019)
 * Add validation option
 * Support config-only generation without an input file
 
