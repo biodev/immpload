@@ -146,20 +146,20 @@ def _validate_static_column(out_col, template):
         raise MungeError(msg)
 
 
-def _is_valid_input_row(row, conf_filter=None):
+def _is_valid_input_row(row, conf):
     """
     Filters blank rows and applies the optional configuration filter
     argument if necessary.
 
     :param row: the input row
-    :param conf_filter: the optional template-specific configuration filter
+    :param config: the configuration
     :return: whether the row should be converted
     """
     # Filter blank rows.
     if all(value == None for value in row):
         return False
     # Apply the config filter, if any.
-    return conf_filter(row) if conf_filter else True
+    return conf.in_filter(row, conf.in_col_ndx_map) if conf.in_filter else True
 
 
 def _validate_output(validator, in_row, in_col_ndx_map, out_col_ndx_map,
@@ -229,7 +229,7 @@ def _munge_file(in_file, reader, writer, config):
             if _is_column_match_only(config):
                 _munge_row(in_file, in_row, i, config, writer)
                 return
-        elif _is_valid_input_row(in_row, config.in_filter):
+        elif _is_valid_input_row(in_row, config):
             _munge_row(in_file, in_row, i, config, writer)
 
 
