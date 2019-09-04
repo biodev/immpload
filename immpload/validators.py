@@ -1,7 +1,8 @@
 import functools
+from . import MungeError
 
 
-class ValidationError(Exception):
+class ValidationError(MungeError):
     pass
 
 
@@ -62,11 +63,23 @@ REQUIRED_COLUMNS = dict(
                        'Planned Visit ID', 'Study Time Collected',
                        'Study Time Collected Unit', 'Study Time T0 Event',
                        'Protocol ID(s)', 'Experiment ID', 'Experiment Name',
-                       'Measurement Technique','Analyte Reported',
-                       'Value Reported', 'Unit Reported'],
+                       'Measurement Technique'],
     treatments=['User Defined ID', 'Name', 'Use Treatment?'],
     reagents=['User Defined ID', 'Manufacturer', 'Catalog Number',
               'Analyte Reported'],
     assessments=['Subject ID', 'Assessment Panel ID', 'Study ID',
                  'Panel Name Reported', 'Component Name Reported',
-                 'User Defined ID', 'Planned Visit ID', 'Study Day'])
+                 'User Defined ID', 'Planned Visit ID', 'Study Day'],
+    FCM_Derived_data=['Expsample ID', 'Population Name Reported',
+                      'Gating Definition Reported',
+                      'Population Statistic (count, percentile, etc)',
+                      'Population Stat Unit Reported', 'Workspace File'])
+
+# ELISA samples require values.
+REQUIRED_COLUMNS['experimentSamples.ELISA'] = (
+    REQUIRED_COLUMNS['experimentSamples'] +
+    ['Analyte Reported', 'Value Reported', 'Unit Reported'])
+
+# Flow samples require the .fcs file name.
+REQUIRED_COLUMNS['experimentSamples.Flow_Cytometry'] = (
+    REQUIRED_COLUMNS['experimentSamples'] + ['.Fcs Result File'])
