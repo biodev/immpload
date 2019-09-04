@@ -24,8 +24,10 @@ column:
 $ immpload subjectAnimals /path/to/input/subjects.txt
 ```
 which will create the Immport upload file `subjectAnimals.txt`
-in the current directory. To place the output in a different
-directory, use the `-o` or `--outDir` option:
+in the current directory.
+
+To place the output in a different directory, use the `-o` or
+`--outDir` option:
 ```
 $ immpload -o /path/to/output subjectAnimals /path/to/input/subjects.xslx
 ```
@@ -134,6 +136,27 @@ default, as follows:
 
 The default is set if and only if the mapped column value is missing.
 
+Defaults are disabled with the `--no-defaults` option, e.g.:
+```
+$ immpload -o /path/to/output --config /path/to/conf/subjects.yaml \
+           --no-defaults subjectAnimals /path/to/input/subjects.xslx
+```
+This is useful when submitting an update to an existing upload.
+
+## Validation
+
+By default, `imppload` checks the output for required fields. If a
+required field is missing, then an error message is displayed and
+processing is halted.
+
+Validation is disabled with the `--no-validate` option, e.g.:
+```
+$ immpload -o /path/to/output --config /path/to/conf/subjects.yaml \
+           --no-validate subjectAnimals /path/to/input/subjects.xslx
+```
+As with `no-defaults`, `no-validate` is useful when submitting an
+update to an existing upload.
+
 ## Callbacks
 
 For advanced usage, the `immpload` Python module can be used directly
@@ -171,21 +194,32 @@ def munge(template, *in_files, config=None, out_dir=None,
     `assessments`. The output is the Immport upload file,
     e.g. `assessments,txt`, placed in the output directory.
 
-    The key word arguments (_kwargs_) are static output
+    The keyword arguments (_kwargs_) are static output
     _column_`=`_value_ definitions that are applied to every
     output row. The column name can be underscored, e.g.
     `Study_ID`.
 
+    Output validation is disabled by default, but recommended
+    for new uploads. Enable validation by setting the _validate_
+    flag parameter to `True`.
+
     :param template: the required Immport template name
     :param in_files: the input file(s) to munge
     :param config: the configuration dictionary or file name
+        of list of file names
     :param out_dir: the target location (default current directory)
     :param sheet: for an Excel workbook input file, the sheet to open
-    :param input_filter: optional generator which has parameter
-        input row and yields valid rows
+    :param input_filter: optional input row validator which has
+        parameter in_row and returns whether the row is valid
     :param callback: optional callback with parameters
         in_row, in_col_ndx_map, out_col_ndx_map and out_row returning
         an array of rows to write to the output file
+    :param defaults_opt: flag indicating whether to add defaults to the
+        output (default `True`)
+    :param validate_opt: flag indicating whether to validate the
+        output for required fields (default `True`)
+    :param append_opt: append rather than overwrite an existing output
+        file (default False)
     :param kwargs: the optional static _column_`=`_value_ definitions
     :return: the output file name
     """
