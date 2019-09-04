@@ -93,19 +93,19 @@ class TestMunger(object):
         out_dir = os.path.join(RESULTS, template, out_subdir)
         out_file = munger.munge(template, in_file, config=config_file,
                                 out_dir=out_dir, callback=callback,
-                                validate=True, **kwargs)
+                                **kwargs)
         assert_is_not_none(out_file, "%s not munged" % template)
         return out_file
 
     def _read_result_file(self, in_file, template):
-        with open(in_file) as fs:
+        with open(in_file) as fd:
             # Skip the header.
-            next(fs)
-            next(fs)
+            next(fd)
+            next(fd)
             # The next line is the column names.
-            cols = self._parse_columns(next(fs), template)
+            cols = self._parse_columns(next(fd), template)
             # Convert the remaining lines to a list of dictionary objects.
-            reader = csv.reader(fs, delimiter='\t')
+            reader = csv.reader(fd, delimiter='\t')
             return [{cols[i]: value for i, value in enumerate(row)}
                     for row in reader]
 
