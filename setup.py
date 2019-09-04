@@ -24,8 +24,8 @@ def version(package):
        ['\"]         # Trailing quote
     """, re.VERBOSE)
 
-    with open(os.path.join(package, '__init__.py')) as f:
-       match = REGEXP.search(f.read())
+    with open(os.path.join(package, '__init__.py')) as fd:
+       match = REGEXP.search(fd.read())
        if not match:
            raise InstallError("The %s __version__ variable was not found" %
                               package)
@@ -33,8 +33,8 @@ def version(package):
 
 
 def readme():
-    with open("README.md") as f:
-        return f.read()
+    with open("README.md") as fd:
+        return fd.read()
 
 
 setup(
@@ -62,5 +62,5 @@ setup(
         'Programming Language :: Python',
         'Programming Language :: Python :: 3',
     ],
-    install_requires = ['bunch', 'PyYAML', 'openpyxl', 'inflection'],
+    install_requires = ['bunch', 'PyYAML', 'openpyxl', 'inflection', 'deepmerge']
 )
