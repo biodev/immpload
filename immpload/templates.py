@@ -1,6 +1,7 @@
 
 from bunch import Bunch
 import requests
+from . import MungeError
 
 # The templates location.
 URL_DIR = 'https://www.immport.org/downloads/data/upload/templates/txt-templates'
@@ -9,7 +10,7 @@ URL_DIR = 'https://www.immport.org/downloads/data/upload/templates/txt-templates
 tmpl_dict = {}
 
 
-class TemplateError(Exception):
+class TemplateError(MungeError):
     pass
 
 
