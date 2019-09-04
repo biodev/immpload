@@ -5,18 +5,16 @@ import yaml
 from bunch import Bunch
 import openpyxl
 import functools
-from . import (templates, defaults, validators)
+from deepmerge import always_merger
+from . import (MungeError, templates, defaults, validators)
 
 """The pattern to detect a config configuration pattern."""
 PATTERN_PAT = re.compile("r['\"](?P<pattern>.+)['\"]$")
 
 
-class MungeError(Exception):
-    pass
-
-
 def munge(template, *in_files, config=None, out_dir=None, sheet=None,
-          input_filter=None, callback=None, validate=False, **kwargs):
+          input_filter=None, callback=None, defaults_opt=True,
+          validate_opt=True, append_opt=False, **kwargs):
     """
     Builds the Immport upload file for the given input file.
     The template is a supported Immport template name, e.g.
@@ -35,6 +33,7 @@ def munge(template, *in_files, config=None, out_dir=None, sheet=None,
     :param template: the required Immport template name
     :param in_files: the input file(s) to munge
     :param config: the configuration dictionary or file name
+        of list of file names
     :param out_dir: the target location (default current directory)
     :param sheet: for an Excel workbook input file, the sheet to open
     :param input_filter: optional input row validator which has
@@ -42,8 +41,12 @@ def munge(template, *in_files, config=None, out_dir=None, sheet=None,
     :param callback: optional callback with parameters
         in_row, in_col_ndx_map, out_col_ndx_map and out_row returning
         an array of rows to write to the output file
-    :param validate: flag indicating whether to validate the
-        output for required fields (default `False`)
+    :param defaults_opt: flag indicating whether to add defaults to the
+        output (default `True`)
+    :param validate_opt: flag indicating whether to validate the
+        output for required fields (default `True`)
+    :param append_opt: append rather than overwrite an existing output
+        file (default False)
     :param kwargs: the optional static _column_`=`_value_ definitions
     :return: the output file name
     """
@@ -53,13 +56,25 @@ def munge(template, *in_files, config=None, out_dir=None, sheet=None,
     # Load the config file, if necessary.
     if config == None:
         config = {}
-    elif isinstance(config, str):
-        with open(config, 'r') as fs:
-            config = yaml.safe_load(fs)
+    else:
+        if isinstance(config, str):
+            config_files = [config]
+        elif isinstance(config, list):
+            config_files = config
+        else:
+            msg = ("Unsupported config parameter - expected" +
+                   " dictionary, string or list of strings: %s" % config)
+            raise MungeError(msg)
+        config = {}
+        for f in config_files:
+            with open(f, 'r') as fd:
+                always_merger.merge(config, yaml.safe_load(fd))
     # Parse the config to a {name, value} bunch.
     config = _parse_config(config)
     # Collect options into the config.
     config.in_filter = input_filter
+    # Capture the append flag.
+    config.append = append_opt
 
     # Remove the template file suffix, if necessary.
     template = re.sub("\.txt$", '', template)
@@ -68,20 +83,23 @@ def munge(template, *in_files, config=None, out_dir=None, sheet=None,
     # Make the output column {name: index} dictionary.
     config.out_col_ndx_map = {col: i
                               for i, col in enumerate(config.template.columns)}
-    # Add the kwargs to the config.
+
+    # Add the kwargs to the static config.
     static_kwargs = {key.replace('_', ' '): value
                      for key, value in kwargs.items()}
     config.static.update(static_kwargs)
     # Validate the static definition.
     for out_col in config.static:
         _validate_static_column(out_col, config.template)
+
     # Add the default template callback, if necessary.
-    def_callback = defaults.get_defaults_callback(template)
-    if def_callback:
-        callback = functools.partial(_add_defaults, def_callback,
-                                     callback=callback)
+    if defaults_opt:
+        def_callback = defaults.get_defaults_callback(template)
+        if def_callback:
+            callback = functools.partial(_add_defaults, def_callback,
+                                         callback=callback)
     # Add validation, if necessary.
-    if validate:
+    if validate_opt:
         validator = validators.get_validator(template)
         if validator:
             callback = functools.partial(_validate_output, validator,
@@ -98,12 +116,16 @@ def munge(template, *in_files, config=None, out_dir=None, sheet=None,
     out_file = os.path.join(out_dir, template + '.txt')
 
     # Convert the input to output.
-    with open(out_file, 'w') as fs:
-        writer = csv.writer(fs, delimiter='\t')
+    mode = 'a' if append_opt else 'w'
+    with open(out_file, mode) as fd:
+        writer = csv.writer(fd, delimiter='\t')
         if in_files:
-            for in_file in in_files:
+            for i, in_file in enumerate(in_files):
                 reader = _create_reader(in_file, sheet=sheet)
                 _munge_file(in_file, reader, writer, config)
+                # Subsequent files append the content.
+                if i == 0:
+                    config.append = True
         else:
             # Only use the configuration to generate output.
             _munge_config(writer, config)
@@ -124,16 +146,20 @@ def _validate_static_column(out_col, template):
         raise MungeError(msg)
 
 
-def _is_valid_input_row(row, config):
+def _is_valid_input_row(row, conf_filter=None):
     """
-    Filters blank rows and applies the optional row filter
-    argument as necessary.
+    Filters blank rows and applies the optional configuration filter
+    argument if necessary.
+
+    :param row: the input row
+    :param conf_filter: the optional template-specific configuration filter
+    :return: whether the row should be converted
     """
     # Filter blank rows.
     if all(value == None for value in row):
         return False
     # Apply the config filter, if any.
-    return config.in_filter(row) if config.in_filter else True
+    return conf_filter(row) if conf_filter else True
 
 
 def _validate_output(validator, in_row, in_col_ndx_map, out_col_ndx_map,
@@ -172,8 +198,9 @@ def _parse_config(config):
               if out_col not in values_dict}
 
     # Invert the {out: in} dictionaries.
-    in_out_names = {in_col: out_col
-                    for out_col, in_col in out_in_columns.items()}
+    in_out_names = {in_col: [] for in_col in out_in_columns.values()}
+    for out_col, in_col in out_in_columns.items():
+        in_out_names[in_col].append(out_col)
     in_out_patterns = {pattern: out_col
                        for out_col, pattern in out_in_patterns.items()}
 
@@ -199,12 +226,26 @@ def _munge_file(in_file, reader, writer, config):
             _capture_input_columns(in_row, config, writer)
             # If the output is entirely determined by column name matching,
             # then generate the output and skip the remaining lines.
-            if set(config.names.values()) == set(config.patterns.values()):
+            if _is_column_match_only(config):
                 _munge_row(in_file, in_row, i, config, writer)
                 return
-        elif _is_valid_input_row(in_file, in_row, i, config):
-            _munge_row(in_file, in_row, config, writer)
+        elif _is_valid_input_row(in_row, config.in_filter):
+            _munge_row(in_file, in_row, i, config, writer)
 
+
+def _is_column_match_only(config):
+    """
+    Returns whether the output generation is determined solely by
+    extracting values from the input column name first row.
+
+    :return: whether the configuration *names* and *patterns*
+        dictionaries are non-empty and map to the same values
+    """
+    if not config.names:
+        return False
+    # Flatten the output column lists into a set.
+    out_cols = {col for cols in config.names.values() for col in cols}
+    return out_cols == set(config.patterns.values())
 
 def _capture_input_columns(in_row, config, writer):
     # Capture the input column names and indexes.
@@ -214,9 +255,10 @@ def _capture_input_columns(in_row, config, writer):
     for in_col in config.in_col_ndx_map:
         if (in_col in config.out_col_ndx_map and
             not in_col in config.names):
-            config.names[in_col] = in_col
+            config.names[in_col] = [in_col]
     # Write the Immport template header lines.
-    _write_header(config.template, writer)
+    if not config.append:
+        _write_header(config.template, writer)
     # Parse the config patterns, now that we have input
     # columns to match against.
     _make_embedded_config(config)
@@ -241,7 +283,8 @@ def _munge_config(writer, config):
     config.in_col_ndx_map = {}
     config.embedded = {}
     # Write the Immport template header lines.
-    _write_header(config.template, writer)
+    if not config.append:
+        _write_header(config.template, writer)
     # The output row generator.
     out_rows = _generate_output([], config)
     # Write the generated rows.
@@ -285,9 +328,12 @@ def _parse_group_dictionary(match_dict, config):
     """
     :return: the {output column: value} dictionary
     """
-    return {config.names[name]: value
-            for name, value in match_dict.items()
-            if name in config.names}
+    cols_values = [(config.names[name], value)
+                   for name, value in match_dict.items()
+                   if name in config.names]
+    return {col: value
+            for cols, value in cols_values
+            for col in cols}
 
 
 def _create_reader(in_file, sheet=None):
@@ -342,10 +388,13 @@ def _apply_callback(in_row, config, out_row):
 
 def _map_row(in_row, config):
     # Map the output columns to output values.
-    values = {config.names[col]: _map_value(col, in_row[i], config)
-              for i, col in enumerate(config.in_col_ndx_map)
-              if col in config.names}
-    out_row = [values.get(col) for col in config.out_col_ndx_map]
+    cols_values_tuples = [(config.names[col], _map_values(col, in_row[i], config))
+                          for i, col in enumerate(config.in_col_ndx_map)
+                          if col in config.names]
+    col_value_dict = {col: values[i]
+                      for cols, values in cols_values_tuples
+                      for i, col in enumerate(cols)}
+    out_row = [col_value_dict.get(col) for col in config.out_col_ndx_map]
     # Set the statically defined column values.
     for out_col, value in config.static.items():
         # Get the static definition output column index.
@@ -355,10 +404,12 @@ def _map_row(in_row, config):
     return out_row
 
 
-def _map_value(in_col, value, config):
-    out_col = config.names[in_col]
-    col_values = config.values_dict.get(out_col)
-    return col_values.get(value, value) if col_values else value
+def _map_values(in_col, value, config):
+    out_cols = config.names[in_col]
+    col_values = [config.values_dict.get(out_col)
+                  for out_col in out_cols]
+    return [value_dict.get(value, value) if value_dict else value
+            for value_dict in col_values]
 
 
 def _generate_embedded_output(in_row, out_row, config):
@@ -389,9 +440,12 @@ def _create_embedded_row(value, out_row, out_col_ndx, config, group_values):
     # Set the embedded column.
     row[out_col_ndx] = value
     # Assign the match group values to the associated output column.
-    for grp_out_col, grp_value in group_values.items():
-        grp_out_col_ndx = config.out_col_ndx_map[grp_out_col]
-        row[grp_out_col_ndx] = grp_value
+    for grp_col, grp_value in group_values.items():
+        # Map the output columns to output values.
+        value_dict = config.values_dict.get(grp_col)
+        value = value_dict.get(grp_value, grp_value) if value_dict else grp_value
+        col_ndx = config.out_col_ndx_map[grp_col]
+        row[col_ndx] = value
 
     return row
 
@@ -424,8 +478,8 @@ def _read_csv(in_file):
     kwargs = {}
     if in_file.endswith('.txt'):
         kwargs['delimiter'] = '\t'
-    with open(in_file) as fs:
-        reader = csv.reader(fs, **kwargs)
+    with open(in_file) as fd:
+        reader = csv.reader(fd, **kwargs)
         for row in reader:
             # Skip empty rows.
             if row and any(row):

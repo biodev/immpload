@@ -1,6 +1,7 @@
 import re
 import inflection
 import functools
+from . import MungeError
 
 TREATMENT_QUALIFIER_TYPES = ['Amount', 'Temperature', 'Duration']
 
@@ -232,10 +233,8 @@ def _default_biosample_id(row, out_col_ndx_map):
         raise MungeError("The Biosample ID, Expsample ID, Biosample Name" +
                          " and Treatment ID(s) values are missing")
 
-    return '_'.join((subject_id,
-                     re.replace(', *', '_', treatment_ids),
-                     time_unit[0].lower() + time,
-                     experiment_id))
+    return '_'.join((subject_id, re.sub(', *', '_', treatment_ids),
+                     time_unit[0].lower() + time, experiment_id))
 
 
 def _default_visit_id(out_col_ndx_map, study_day_column, row, experiment_type=None):
