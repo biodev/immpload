@@ -1,5 +1,8 @@
 # Release History
 
+## Version 1.1.2 (09/04/2019)
+* Add input column index map argument to the input filter.
+
 ## Version 1.1.1 (09/03/2019)
 * Add validation option
 * Support config-only generation without an input file
